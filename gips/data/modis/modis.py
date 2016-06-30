@@ -70,13 +70,13 @@ class modisAsset(Asset):
 
     _assets = {
         'MCD43A4': {
-            'pattern': 'MCD43A4*hdf',
+            'pattern': 'MCD43A4.A???????.h??v??.???.?????????????.hdf',
             'url': 'http://e4ftl01.cr.usgs.gov/MOTA/MCD43A4.006',
             'startdate': datetime.date(2000, 2, 18),
             'latency': -15
         },
         'MCD43A2': {
-            'pattern': 'MCD43A2*hdf',
+            'pattern': 'MCD43A2.A???????.h??v??.???.?????????????.hdf',
             'url': 'http://e4ftl01.cr.usgs.gov/MOTA/MCD43A2.006',
             'startdate': datetime.date(2000, 2, 18),
             'latency': -15
@@ -226,8 +226,6 @@ class modisAsset(Asset):
                 self.tile == newasset.tile and
                 self.date == newasset.date and
                 self.version < newasset.version)
-
-
             
 class modisData(Data):
     """ A tile of data (all assets and products) """
@@ -310,7 +308,8 @@ class modisData(Data):
             missingassets = []
             availassets = []
             allsds = []
-
+            versions = {}
+            
             # Default sensor for products
             sensor = 'MCD'
 
@@ -322,6 +321,8 @@ class modisData(Data):
                 else:
                     availassets.append(asset)
                     allsds.extend(sds)
+                    versions[asset] = int(re.findall('MCD43A4.*\.00(\d)\.\d{13}\.hdf', sds[0])[0])
+                    
             if not availassets:
                 # some products aren't available for every day but this is trying every day
                 VerboseOut('There are no available assets (%s) on %s for tile %s'
@@ -330,7 +331,6 @@ class modisData(Data):
 
             meta = self.meta_dict()
             meta['AVAILABLE_ASSETS'] = ' '.join(availassets)
-
 
             if val[0] == "landcover":
                 fname = '%s_%s_%s.tif' % (bname, sensor, key)
@@ -341,6 +341,8 @@ class modisData(Data):
 
 
             if val[0] == "refl":
+                if versions[asset] != 6:
+                    raise Exception('product version not supported')
                 fname = '%s_%s_%s.tif' % (bname, sensor, key)
                 img = gippy.GeoImage(sds[7:])
                 nodata = img[0].NoDataValue()
@@ -356,6 +358,8 @@ class modisData(Data):
 
                 
             if val[0] == "quality":
+                if versions[asset] != 6:
+                    raise Exception('product version not supported')
                 fname = '%s_%s_%s.tif' % (bname, sensor, key)
                 img = gippy.GeoImage(sds[:7])
                 nodata = img[0].NoDataValue()
@@ -372,22 +376,29 @@ class modisData(Data):
 
             # LAND VEGETATION INDICES PRODUCT
             if val[0] == "indices":
-
                 VERSION = "2.0"
                 meta['VERSION'] = VERSION
                 sensor = 'MCD'
                 fname = '%s_%s_%s' % (bname, sensor, key)
-
                 refl = gippy.GeoImage(allsds)
-
                 missing = 32767
 
-                redimg = refl[7].Read()
-                nirimg = refl[8].Read()
-                bluimg = refl[9].Read()
-                grnimg = refl[10].Read()
-                mirimg = refl[11].Read()
-                swrimg = refl[12].Read() # formerly swir2
+                if versions[asset] == 6:                
+                    redimg = refl[7].Read()
+                    nirimg = refl[8].Read()
+                    bluimg = refl[9].Read()
+                    grnimg = refl[10].Read()
+                    mirimg = refl[11].Read()
+                    swrimg = refl[12].Read() # formerly swir2
+                elif versions[asset] == 5:
+                    redimg = refl[0].Read()
+                    nirimg = refl[1].Read()
+                    bluimg = refl[2].Read()
+                    grnimg = refl[3].Read()
+                    mirimg = refl[4].Read()
+                    swrimg = refl[5].Read() # formerly swir2
+                else:
+                    raise Exception('product version not supported')
 
                 redimg[redimg < 0.0] = 0.0
                 nirimg[nirimg < 0.0] = 0.0
