@@ -14,6 +14,7 @@ To permit automated testing, create a file named `pytest.ini` in the project
 directory, and use it to set the `data-repo` and `output-dir` settings to full
 paths to the respective directories.
 
+
 ```
 [pytest]
 # GIPS' configured data repository:
